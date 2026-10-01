@@ -24,6 +24,10 @@ var_listen_address="${var_listen_address:-0.0.0.0}"
 var_tls_mode="${var_tls_mode:-selfsigned}"
 var_tls_hostname="${var_tls_hostname:-}"
 var_tls_email="${var_tls_email:-}"
+var_acme_challenge="${var_acme_challenge:-http}"
+var_duckdns_domain="${var_duckdns_domain:-}"
+var_duckdns_token="${var_duckdns_token:-}"
+var_duckdns_update_ip="${var_duckdns_update_ip:-false}"
 
 case "$var_browser" in
 falkon | firefox | chromium | both | all | none) ;;
@@ -49,6 +53,22 @@ selfsigned | letsencrypt) ;;
   ;;
 esac
 
+case "$var_acme_challenge" in
+http | duckdns) ;;
+*)
+  msg_error "Invalid var_acme_challenge '${var_acme_challenge}'. Use http or duckdns."
+  exit 1
+  ;;
+esac
+
+case "$var_duckdns_update_ip" in
+true | false) ;;
+*)
+  msg_error "Invalid var_duckdns_update_ip '${var_duckdns_update_ip}'. Use true or false."
+  exit 1
+  ;;
+esac
+
 if [[ "$var_tls_mode" == "letsencrypt" ]]; then
   if [[ ! "$var_tls_hostname" =~ ^([A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,63}$ ]]; then
     msg_error "A valid public FQDN is required for Let's Encrypt."
@@ -58,6 +78,22 @@ if [[ "$var_tls_mode" == "letsencrypt" ]]; then
     msg_error "A valid email address is required for Let's Encrypt."
     exit 1
   fi
+fi
+
+if [[ "$var_acme_challenge" == "duckdns" || "$var_duckdns_update_ip" == "true" ]]; then
+  if [[ ! "$var_duckdns_domain" =~ ^[A-Za-z0-9][A-Za-z0-9-]{0,62}$ ]]; then
+    msg_error "A DuckDNS base subdomain is required, for example 'myhost' for myhost.duckdns.org."
+    exit 1
+  fi
+  if [[ ! "$var_duckdns_token" =~ ^[A-Za-z0-9-]{20,128}$ ]]; then
+    msg_error "A valid DuckDNS token is required."
+    exit 1
+  fi
+fi
+
+if [[ "$var_acme_challenge" == "duckdns" && "$var_tls_mode" != "letsencrypt" ]]; then
+  msg_error "var_acme_challenge=duckdns requires var_tls_mode=letsencrypt."
+  exit 1
 fi
 
 if [[ ! "$var_desktop_user" =~ ^[a-z_][a-z0-9_-]{0,31}$ ]]; then
@@ -213,6 +249,71 @@ esac
 chown -R "$var_desktop_user:$desktop_group"   "$desktop_home/.vnc"   "$desktop_home/.config"   "$desktop_home/Downloads"
 msg_ok "Configured Openbox session"
 
+if [[ "$var_acme_challenge" == "duckdns" || "$var_duckdns_update_ip" == "true" ]]; then
+  install -d -m 0755 /etc/kasmvnc-desktop
+  cat >/etc/kasmvnc-desktop/duckdns.conf <<EOF
+DUCKDNS_DOMAIN='${var_duckdns_domain}'
+DUCKDNS_TOKEN='${var_duckdns_token}'
+EOF
+  chmod 0600 /etc/kasmvnc-desktop/duckdns.conf
+fi
+
+if [[ "$var_duckdns_update_ip" == "true" ]]; then
+  msg_info "Configuring DuckDNS dynamic DNS updates"
+  cat >/usr/local/sbin/kasmvnc-duckdns-update <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+source /etc/kasmvnc-desktop/duckdns.conf
+export DUCKDNS_DOMAIN DUCKDNS_TOKEN
+
+python3 <<'PY'
+import os
+import urllib.parse
+import urllib.request
+
+params = urllib.parse.urlencode({
+    "domains": os.environ["DUCKDNS_DOMAIN"],
+    "token": os.environ["DUCKDNS_TOKEN"],
+})
+with urllib.request.urlopen("https://www.duckdns.org/update?" + params, timeout=20) as response:
+    result = response.read().decode().strip()
+if result != "OK":
+    raise SystemExit(f"DuckDNS update failed: {result}")
+PY
+EOF
+  chmod 0755 /usr/local/sbin/kasmvnc-duckdns-update
+
+  cat >/etc/systemd/system/kasmvnc-duckdns.service <<'EOF'
+[Unit]
+Description=Update DuckDNS address
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/kasmvnc-duckdns-update
+EOF
+
+  cat >/etc/systemd/system/kasmvnc-duckdns.timer <<'EOF'
+[Unit]
+Description=Periodically update DuckDNS address
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=5min
+RandomizedDelaySec=30
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+EOF
+
+  systemctl daemon-reload
+  systemctl enable -q --now kasmvnc-duckdns.timer
+  /usr/local/sbin/kasmvnc-duckdns-update
+  msg_ok "Configured DuckDNS dynamic DNS updates"
+fi
+
 if [[ "$var_tls_mode" == "letsencrypt" ]]; then
   msg_info "Requesting Let's Encrypt certificate for ${var_tls_hostname}"
   install -d -m 0750 -o root -g ssl-cert /etc/kasmvnc-desktop/tls
@@ -235,15 +336,78 @@ fi
 EOF
   chmod 0755 /etc/letsencrypt/renewal-hooks/deploy/kasmvnc-desktop
 
-  certbot certonly \
-    --standalone \
-    --non-interactive \
-    --agree-tos \
-    --preferred-challenges http-01 \
-    --email "$var_tls_email" \
-    --domain "$var_tls_hostname"
+  if [[ "$var_acme_challenge" == "duckdns" ]]; then
+    cat >/usr/local/sbin/kasmvnc-duckdns-acme-auth <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+source /etc/kasmvnc-desktop/duckdns.conf
+export DUCKDNS_DOMAIN DUCKDNS_TOKEN CERTBOT_VALIDATION
+
+python3 <<'PY'
+import os
+import urllib.parse
+import urllib.request
+
+params = urllib.parse.urlencode({
+    "domains": os.environ["DUCKDNS_DOMAIN"],
+    "token": os.environ["DUCKDNS_TOKEN"],
+    "txt": os.environ["CERTBOT_VALIDATION"],
+})
+with urllib.request.urlopen("https://www.duckdns.org/update?" + params, timeout=20) as response:
+    result = response.read().decode().strip()
+if result != "OK":
+    raise SystemExit(f"DuckDNS TXT update failed: {result}")
+PY
+
+sleep 60
+EOF
+    chmod 0755 /usr/local/sbin/kasmvnc-duckdns-acme-auth
+
+    cat >/usr/local/sbin/kasmvnc-duckdns-acme-cleanup <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+source /etc/kasmvnc-desktop/duckdns.conf
+export DUCKDNS_DOMAIN DUCKDNS_TOKEN
+
+python3 <<'PY'
+import os
+import urllib.parse
+import urllib.request
+
+params = urllib.parse.urlencode({
+    "domains": os.environ["DUCKDNS_DOMAIN"],
+    "token": os.environ["DUCKDNS_TOKEN"],
+    "clear": "true",
+})
+with urllib.request.urlopen("https://www.duckdns.org/update?" + params, timeout=20) as response:
+    result = response.read().decode().strip()
+if result != "OK":
+    raise SystemExit(f"DuckDNS TXT cleanup failed: {result}")
+PY
+EOF
+    chmod 0755 /usr/local/sbin/kasmvnc-duckdns-acme-cleanup
+
+    certbot certonly \
+      --manual \
+      --preferred-challenges dns \
+      --manual-auth-hook /usr/local/sbin/kasmvnc-duckdns-acme-auth \
+      --manual-cleanup-hook /usr/local/sbin/kasmvnc-duckdns-acme-cleanup \
+      --non-interactive \
+      --agree-tos \
+      --email "$var_tls_email" \
+      --domain "$var_tls_hostname"
+  else
+    certbot certonly \
+      --standalone \
+      --non-interactive \
+      --agree-tos \
+      --preferred-challenges http-01 \
+      --email "$var_tls_email" \
+      --domain "$var_tls_hostname"
+  fi
 
   /etc/letsencrypt/renewal-hooks/deploy/kasmvnc-desktop
+  systemctl enable -q --now certbot.timer 2>/dev/null || true
   msg_ok "Installed Let's Encrypt certificate"
 fi
 
