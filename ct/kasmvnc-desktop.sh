@@ -25,7 +25,7 @@ var_unprivileged="${var_unprivileged:-1}"
 
 # Application-specific variables. These are deliberately environment-driven so
 # they can later map directly to Community Scripts app_vars.
-export var_browser="${var_browser:-firefox}"
+export var_browser="${var_browser:-falkon}"
 export var_auth_mode="${var_auth_mode:-kasm}"
 export var_desktop_user="${var_desktop_user:-desktop}"
 export var_kasm_user="${var_kasm_user:-desktop}"
@@ -88,6 +88,7 @@ function update_script() {
   msg_ok "Refreshed Debian package metadata"
 
   local browser_packages=()
+  dpkg-query -W falkon >/dev/null 2>&1 && browser_packages+=(falkon)
   dpkg-query -W firefox-esr >/dev/null 2>&1 && browser_packages+=(firefox-esr)
   dpkg-query -W chromium >/dev/null 2>&1 && browser_packages+=(chromium)
   if ((${#browser_packages[@]} > 0)); then
