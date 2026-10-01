@@ -20,14 +20,14 @@ Default installation:
 - 16 GiB root disk
 - KasmVNC
 - Openbox
-- Firefox ESR
+- Falkon
 - persistent `desktop` user/profile
 
 Docker and LXC nesting are not required.
 
 ## Features
 
-- Firefox ESR, Chromium, both, or no browser
+- Falkon, Firefox ESR, Chromium, multiple browsers, or no browser
 - additional validated Debian packages
 - KasmVNC username/password authentication
 - optional external/no-auth mode for an authenticating reverse proxy
@@ -61,7 +61,7 @@ variables. They are designed to map to Community Scripts `app_vars` later.
 
 | Variable | Default | Values / meaning |
 | --- | --- | --- |
-| `var_browser` | `firefox` | `firefox`, `chromium`, `both`, `none` |
+| `var_browser` | `falkon` | `falkon`, `firefox`, `chromium`, `both` (Firefox + Chromium), `all`, `none` |
 | `var_auth_mode` | `kasm` | `kasm` or `external` |
 | `var_desktop_user` | `desktop` | Linux desktop account |
 | `var_kasm_user` | `desktop` | KasmVNC login name |
