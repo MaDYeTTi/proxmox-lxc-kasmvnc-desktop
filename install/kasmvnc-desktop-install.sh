@@ -246,6 +246,8 @@ cat >/etc/systemd/system/kasmvnc-desktop.service <<EOF
 Description=KasmVNC Desktop
 After=network-online.target
 Wants=network-online.target
+StartLimitIntervalSec=30
+StartLimitBurst=5
 
 [Service]
 Type=simple
