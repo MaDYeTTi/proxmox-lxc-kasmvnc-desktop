@@ -37,6 +37,22 @@ Additional Debian packages may be installed with `var_extra_packages`.
 Input is treated as a whitespace-separated list of Debian package names and is
 validated before being passed to APT. It is not a shell command hook.
 
+## TLS certificate modes
+
+`var_tls_mode`:
+
+- `selfsigned` — default KasmVNC/Debian certificate behavior; preferred behind
+  a reverse proxy
+- `letsencrypt` — direct-access mode using Certbot standalone HTTP-01
+
+Let's Encrypt mode requires `var_tls_hostname` and `var_tls_email`. Public
+DNS and inbound TCP/80 must reach the LXC for initial issuance and future
+renewals. Certbot's deploy hook copies renewed material into a service-specific
+directory readable through the `ssl-cert` group, then restarts KasmVNC.
+
+TLS and application authentication are independent. A direct Internet-facing
+Let's Encrypt deployment should normally keep `var_auth_mode=kasm`.
+
 ## Authentication
 
 `var_auth_mode`:
