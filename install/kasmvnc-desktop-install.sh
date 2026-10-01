@@ -13,7 +13,7 @@ setting_up_container
 network_check
 update_os
 
-var_browser="${var_browser:-firefox}"
+var_browser="${var_browser:-falkon}"
 var_auth_mode="${var_auth_mode:-kasm}"
 var_desktop_user="${var_desktop_user:-desktop}"
 var_kasm_user="${var_kasm_user:-desktop}"
@@ -23,9 +23,9 @@ var_web_port="${var_web_port:-8443}"
 var_listen_address="${var_listen_address:-0.0.0.0}"
 
 case "$var_browser" in
-firefox | chromium | both | none) ;;
+falkon | firefox | chromium | both | all | none) ;;
 *)
-  msg_error "Invalid var_browser '${var_browser}'. Use firefox, chromium, both, or none."
+  msg_error "Invalid var_browser '${var_browser}'. Use falkon, firefox, chromium, both, all, or none."
   exit 1
   ;;
 esac
@@ -64,6 +64,9 @@ msg_ok "Installed desktop dependencies"
 
 browser_packages=()
 case "$var_browser" in
+falkon)
+  browser_packages+=(falkon)
+  ;;
 firefox)
   browser_packages+=(firefox-esr)
   ;;
@@ -72,6 +75,9 @@ chromium)
   ;;
 both)
   browser_packages+=(firefox-esr chromium)
+  ;;
+all)
+  browser_packages+=(falkon firefox-esr chromium)
   ;;
 none) ;;
 esac
@@ -143,6 +149,11 @@ EOF
 chmod 0755 "$desktop_home/.vnc/xstartup"
 
 case "$var_browser" in
+falkon)
+  cat >"$desktop_home/.config/openbox/autostart" <<'EOF'
+falkon &
+EOF
+  ;;
 firefox | both)
   cat >"$desktop_home/.config/openbox/autostart" <<'EOF'
 firefox-esr --new-instance &
@@ -151,6 +162,11 @@ EOF
 chromium)
   cat >"$desktop_home/.config/openbox/autostart" <<'EOF'
 chromium --no-first-run --start-maximized &
+EOF
+  ;;
+all)
+  cat >"$desktop_home/.config/openbox/autostart" <<'EOF'
+falkon &
 EOF
   ;;
 none)
