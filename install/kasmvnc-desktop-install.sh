@@ -21,6 +21,9 @@ var_kasm_password="${var_kasm_password:-}"
 var_extra_packages="${var_extra_packages:-}"
 var_web_port="${var_web_port:-8443}"
 var_listen_address="${var_listen_address:-0.0.0.0}"
+var_tls_mode="${var_tls_mode:-selfsigned}"
+var_tls_hostname="${var_tls_hostname:-}"
+var_tls_email="${var_tls_email:-}"
 
 case "$var_browser" in
 falkon | firefox | chromium | both | all | none) ;;
@@ -37,6 +40,25 @@ kasm | external) ;;
   exit 1
   ;;
 esac
+
+case "$var_tls_mode" in
+selfsigned | letsencrypt) ;;
+*)
+  msg_error "Invalid var_tls_mode '${var_tls_mode}'. Use selfsigned or letsencrypt."
+  exit 1
+  ;;
+esac
+
+if [[ "$var_tls_mode" == "letsencrypt" ]]; then
+  if [[ ! "$var_tls_hostname" =~ ^([A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,63}$ ]]; then
+    msg_error "A valid public FQDN is required for Let's Encrypt."
+    exit 1
+  fi
+  if [[ ! "$var_tls_email" =~ ^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$ ]]; then
+    msg_error "A valid email address is required for Let's Encrypt."
+    exit 1
+  fi
+fi
 
 if [[ ! "$var_desktop_user" =~ ^[a-z_][a-z0-9_-]{0,31}$ ]]; then
   msg_error "Invalid desktop username '${var_desktop_user}'."
@@ -61,6 +83,12 @@ fi
 msg_info "Installing desktop dependencies"
 $STD apt-get install -y   ca-certificates   curl   jq   openssl   ssl-cert   dbus-x11   openbox   xterm   xdg-utils   fonts-dejavu-core   fonts-liberation
 msg_ok "Installed desktop dependencies"
+
+if [[ "$var_tls_mode" == "letsencrypt" ]]; then
+  msg_info "Installing Certbot"
+  $STD apt-get install -y certbot
+  msg_ok "Installed Certbot"
+fi
 
 browser_packages=()
 case "$var_browser" in
@@ -185,8 +213,69 @@ esac
 chown -R "$var_desktop_user:$desktop_group"   "$desktop_home/.vnc"   "$desktop_home/.config"   "$desktop_home/Downloads"
 msg_ok "Configured Openbox session"
 
+if [[ "$var_tls_mode" == "letsencrypt" ]]; then
+  msg_info "Requesting Let's Encrypt certificate for ${var_tls_hostname}"
+  install -d -m 0750 -o root -g ssl-cert /etc/kasmvnc-desktop/tls
+  install -d -m 0755 /etc/letsencrypt/renewal-hooks/deploy
+
+  cat >/etc/letsencrypt/renewal-hooks/deploy/kasmvnc-desktop <<EOF
+#!/usr/bin/env bash
+set -euo pipefail
+
+install -m 0640 -o root -g ssl-cert \
+  "/etc/letsencrypt/live/${var_tls_hostname}/fullchain.pem" \
+  /etc/kasmvnc-desktop/tls/fullchain.pem
+install -m 0640 -o root -g ssl-cert \
+  "/etc/letsencrypt/live/${var_tls_hostname}/privkey.pem" \
+  /etc/kasmvnc-desktop/tls/privkey.pem
+
+if systemctl -q is-enabled kasmvnc-desktop.service 2>/dev/null; then
+  systemctl restart kasmvnc-desktop.service
+fi
+EOF
+  chmod 0755 /etc/letsencrypt/renewal-hooks/deploy/kasmvnc-desktop
+
+  certbot certonly \
+    --standalone \
+    --non-interactive \
+    --agree-tos \
+    --preferred-challenges http-01 \
+    --email "$var_tls_email" \
+    --domain "$var_tls_hostname"
+
+  /etc/letsencrypt/renewal-hooks/deploy/kasmvnc-desktop
+  msg_ok "Installed Let's Encrypt certificate"
+fi
+
 msg_info "Configuring KasmVNC"
-cat >"$desktop_home/.vnc/kasmvnc.yaml" <<EOF
+if [[ "$var_tls_mode" == "letsencrypt" ]]; then
+  cat >"$desktop_home/.vnc/kasmvnc.yaml" <<EOF
+desktop:
+  resolution:
+    width: 1920
+    height: 1080
+  allow_resize: true
+  pixel_depth: 24
+
+network:
+  interface: ${var_listen_address}
+  websocket_port: ${var_web_port}
+  use_ipv4: true
+  use_ipv6: true
+  ssl:
+    pem_certificate: /etc/kasmvnc-desktop/tls/fullchain.pem
+    pem_key: /etc/kasmvnc-desktop/tls/privkey.pem
+    require_ssl: true
+
+user_session:
+  session_type: exclusive
+  idle_timeout: never
+
+command_line:
+  prompt: false
+EOF
+else
+  cat >"$desktop_home/.vnc/kasmvnc.yaml" <<EOF
 desktop:
   resolution:
     width: 1920
@@ -209,6 +298,7 @@ user_session:
 command_line:
   prompt: false
 EOF
+fi
 chown "$var_desktop_user:$desktop_group" "$desktop_home/.vnc/kasmvnc.yaml"
 chmod 0600 "$desktop_home/.vnc/kasmvnc.yaml"
 
@@ -299,6 +389,10 @@ if [[ "$var_auth_mode" == "external" ]]; then
   msg_warn "KasmVNC authentication is disabled. Restrict direct access to port ${var_web_port} and protect the service with an authenticating reverse proxy or equivalent control."
 elif [[ "${credentials_generated:-0}" == "1" ]]; then
   msg_warn "A KasmVNC password was generated. Retrieve it from /root/kasmvnc-desktop-credentials inside the container."
+fi
+
+if [[ "$var_tls_mode" == "letsencrypt" ]]; then
+  msg_ok "Let's Encrypt certificate enabled for ${var_tls_hostname}"
 fi
 
 motd_ssh
