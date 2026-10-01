@@ -193,7 +193,11 @@ description
 
 msg_ok "Completed successfully!\n"
 echo -e "${CREATING}${GN}${APP} setup has been successfully initialized!${CL}"
-echo -e "${INFO}${YW}Access KasmVNC at: ${BGN}https://${IP}:${var_web_port}${CL}"
+if [[ "$var_tls_mode" == "letsencrypt" ]]; then
+  echo -e "${INFO}${YW}Access KasmVNC at: ${BGN}https://${var_tls_hostname}:${var_web_port}${CL}"
+else
+  echo -e "${INFO}${YW}Access KasmVNC at: ${BGN}https://${IP}:${var_web_port}${CL}"
+fi
 if [[ "$var_auth_mode" == "external" ]]; then
   echo -e "${INFO}${YW}Authentication mode: external/none. Do not expose the KasmVNC backend directly.${CL}"
 fi
