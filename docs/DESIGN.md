@@ -43,12 +43,22 @@ validated before being passed to APT. It is not a shell command hook.
 
 - `selfsigned` — default KasmVNC/Debian certificate behavior; preferred behind
   a reverse proxy
-- `letsencrypt` — direct-access mode using Certbot standalone HTTP-01
+- `letsencrypt` — direct-access mode using Certbot
 
-Let's Encrypt mode requires `var_tls_hostname` and `var_tls_email`. Public
-DNS and inbound TCP/80 must reach the LXC for initial issuance and future
-renewals. Certbot's deploy hook copies renewed material into a service-specific
-directory readable through the `ssl-cert` group, then restarts KasmVNC.
+`var_acme_challenge` selects certificate validation:
+
+- `http` — standalone HTTP-01; public DNS and inbound TCP/80 must reach the LXC
+- `duckdns` — DNS-01 using DuckDNS' TXT update API; no inbound validation port
+  is required
+
+DuckDNS DNS-01 requires `var_duckdns_domain` and `var_duckdns_token`.
+`var_duckdns_update_ip=true` additionally installs a systemd timer that updates
+the DuckDNS IPv4 record every five minutes. DDNS and ACME validation are
+separate features and can be enabled independently.
+
+Let's Encrypt mode requires `var_tls_hostname` and `var_tls_email`. Certbot's
+deploy hook copies renewed material into a service-specific directory readable
+through the `ssl-cert` group, then restarts KasmVNC.
 
 TLS and application authentication are independent. A direct Internet-facing
 Let's Encrypt deployment should normally keep `var_auth_mode=kasm`.
