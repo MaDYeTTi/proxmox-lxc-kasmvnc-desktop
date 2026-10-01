@@ -53,8 +53,8 @@ if [[ ! "$var_web_port" =~ ^[0-9]+$ ]] || ((var_web_port < 1 || var_web_port > 6
   exit 1
 fi
 
-if [[ "$var_listen_address" =~ [[:space:]] ]]; then
-  msg_error "Listen address must not contain whitespace."
+if [[ ! "$var_listen_address" =~ ^[A-Za-z0-9:._-]+$ ]]; then
+  msg_error "Invalid listen address '${var_listen_address}'."
   exit 1
 fi
 
@@ -76,7 +76,7 @@ both)
 none) ;;
 esac
 
-if (("${#browser_packages[@]}" > 0)); then
+if ((${#browser_packages[@]} > 0)); then
   msg_info "Installing browser packages"
   $STD apt-get install -y "${browser_packages[@]}"
   msg_ok "Installed browser packages"
@@ -98,7 +98,7 @@ if [[ -n "$var_extra_packages" ]]; then
     extra_packages+=("$package")
   done
 
-  if (("${#extra_packages[@]}" > 0)); then
+  if ((${#extra_packages[@]} > 0)); then
     msg_info "Installing additional packages"
     $STD apt-get install -y "${extra_packages[@]}"
     msg_ok "Installed additional packages"
