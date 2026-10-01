@@ -69,6 +69,9 @@ variables. They are designed to map to Community Scripts `app_vars` later.
 | `var_extra_packages` | empty | whitespace-separated Debian packages |
 | `var_web_port` | `8443` | KasmVNC web port |
 | `var_listen_address` | `0.0.0.0` | KasmVNC listen address |
+| `var_tls_mode` | `selfsigned` | `selfsigned` or `letsencrypt` |
+| `var_tls_hostname` | empty | public FQDN for Let's Encrypt mode |
+| `var_tls_email` | empty | ACME registration email for Let's Encrypt mode |
 | `var_bind_mounts` | empty | optional host bind mounts |
 
 Example for Chromium plus a few desktop tools:
@@ -80,6 +83,41 @@ export var_extra_packages="thunar mousepad"
 
 bash -c "$(curl -fsSL "$COMMUNITY_SCRIPTS_URL/ct/kasmvnc-desktop.sh")"
 ```
+
+## Optional Let's Encrypt certificate
+
+For direct-access deployments without a reverse proxy, KasmVNC can request and
+renew a publicly trusted Let's Encrypt certificate using Certbot's standalone
+HTTP-01 challenge.
+
+Requirements:
+
+- the hostname must resolve publicly to the connection reaching this container
+- inbound TCP/80 must reach the container during issuance and renewal
+- TCP/80 must be available to Certbot
+- KasmVNC should normally keep its own authentication enabled for direct access
+
+Example:
+
+```bash
+export var_tls_mode="letsencrypt"
+export var_tls_hostname="desktop.example.com"
+export var_tls_email="admin@example.com"
+```
+
+The certificate is requested with Certbot and copied to
+`/etc/kasmvnc-desktop/tls/` with permissions readable by the KasmVNC service.
+A Certbot deploy hook refreshes those files and restarts
+`kasmvnc-desktop.service` after successful renewal.
+
+The resulting direct URL is:
+
+```text
+https://desktop.example.com:8443
+```
+
+The default remains `selfsigned`, which is appropriate when TLS terminates at
+a reverse proxy such as Caddy.
 
 ## External authentication / reverse proxy mode
 
