@@ -89,7 +89,7 @@ function update_script() {
   local browser_packages=()
   dpkg-query -W firefox-esr >/dev/null 2>&1 && browser_packages+=(firefox-esr)
   dpkg-query -W chromium >/dev/null 2>&1 && browser_packages+=(chromium)
-  if (("${#browser_packages[@]}" > 0)); then
+  if ((${#browser_packages[@]} > 0)); then
     msg_info "Updating installed browser packages"
     apt-get install -y --only-upgrade "${browser_packages[@]}"
     msg_ok "Updated installed browser packages"
@@ -135,7 +135,7 @@ validate_bind_mount_entry() {
 next_mount_index() {
   local i=0
   while pct config "$CTID" | grep -q "^mp${i}:"; do
-    ((i++))
+    ((i += 1))
   done
   echo "$i"
 }
