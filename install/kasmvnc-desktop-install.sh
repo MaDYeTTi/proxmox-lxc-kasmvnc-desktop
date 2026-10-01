@@ -259,8 +259,8 @@ WorkingDirectory=${desktop_home}
 ExecStartPre=-/usr/bin/vncserver -kill :1
 ExecStart=/usr/local/sbin/kasmvnc-desktop-start
 ExecStop=-/usr/bin/vncserver -kill :1
-Restart=on-failure
-RestartSec=5
+Restart=always
+RestartSec=3
 TimeoutStopSec=20
 
 [Install]
