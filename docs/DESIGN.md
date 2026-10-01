@@ -18,7 +18,7 @@ the Proxmox Community Scripts project with minimal rework.
 - KasmVNC
 - Openbox
 - persistent desktop user and profile
-- Firefox ESR by default
+- Falkon by default
 
 No Docker and no nested container runtime are required.
 
@@ -26,9 +26,11 @@ No Docker and no nested container runtime are required.
 
 `var_browser`:
 
-- `firefox` — Firefox ESR (default)
+- `falkon` — Falkon (default; lightweight Qt WebEngine browser)
+- `firefox` — Firefox ESR
 - `chromium` — Chromium
-- `both` — install both
+- `both` — Firefox ESR and Chromium
+- `all` — Falkon, Firefox ESR and Chromium
 - `none` — no browser; useful with `var_extra_packages`
 
 Additional Debian packages may be installed with `var_extra_packages`.
