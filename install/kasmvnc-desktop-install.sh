@@ -140,6 +140,12 @@ install -d -m 0700 -o "$var_desktop_user" -g "$desktop_group"   "$desktop_home/.
 msg_ok "Created desktop user"
 
 msg_info "Configuring Openbox session"
+if [[ -f /etc/xdg/openbox/rc.xml ]]; then
+  cp /etc/xdg/openbox/rc.xml "$desktop_home/.config/openbox/rc.xml"
+  sed -i '/<desktops>/,/<\/desktops>/ s#<number>[0-9][0-9]*</number>#<number>1</number>#' \
+    "$desktop_home/.config/openbox/rc.xml"
+fi
+
 cat >"$desktop_home/.vnc/xstartup" <<'EOF'
 #!/bin/sh
 unset SESSION_MANAGER
