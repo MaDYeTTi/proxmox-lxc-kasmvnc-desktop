@@ -10,6 +10,7 @@
 export COMMUNITY_SCRIPTS_URL="${COMMUNITY_SCRIPTS_URL:-https://raw.githubusercontent.com/MaDYeTTi/proxmox-lxc-kasmvnc-desktop/main}"
 
 _cs_boot="${COMMUNITY_SCRIPTS_CORE_DIR:-$(dirname "${BASH_SOURCE[0]}")/../../core}/core/build.func"
+# shellcheck disable=SC1090
 source "$_cs_boot" 2>/dev/null || source <(curl -fsSL "${COMMUNITY_SCRIPTS_CORE_URL:-https://raw.githubusercontent.com/community-scripts/core/main}/core/build.func")
 
 APP="KasmVNC Desktop"
@@ -38,7 +39,7 @@ header_info "$APP"
 variables
 # APP contains a space; keep the public/application slug hyphenated.
 NSAPP="kasmvnc-desktop"
-var_install="${NSAPP}-install"
+export var_install="${NSAPP}-install"
 color
 catch_errors
 
