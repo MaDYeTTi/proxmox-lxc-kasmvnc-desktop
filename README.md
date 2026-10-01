@@ -72,6 +72,10 @@ variables. They are designed to map to Community Scripts `app_vars` later.
 | `var_tls_mode` | `selfsigned` | `selfsigned` or `letsencrypt` |
 | `var_tls_hostname` | empty | public FQDN for Let's Encrypt mode |
 | `var_tls_email` | empty | ACME registration email for Let's Encrypt mode |
+| `var_acme_challenge` | `http` | `http` or `duckdns` |
+| `var_duckdns_domain` | empty | DuckDNS base subdomain, e.g. `myhost` |
+| `var_duckdns_token` | empty | DuckDNS account token |
+| `var_duckdns_update_ip` | `false` | periodically update the DuckDNS public IPv4 |
 | `var_bind_mounts` | empty | optional host bind mounts |
 
 Example for Chromium plus a few desktop tools:
@@ -87,15 +91,15 @@ bash -c "$(curl -fsSL "$COMMUNITY_SCRIPTS_URL/ct/kasmvnc-desktop.sh")"
 ## Optional Let's Encrypt certificate
 
 For direct-access deployments without a reverse proxy, KasmVNC can request and
-renew a publicly trusted Let's Encrypt certificate using Certbot's standalone
-HTTP-01 challenge.
+renew a publicly trusted Let's Encrypt certificate.
 
-Requirements:
+Two ACME challenge modes are supported:
 
-- the hostname must resolve publicly to the connection reaching this container
-- inbound TCP/80 must reach the container during issuance and renewal
-- TCP/80 must be available to Certbot
-- KasmVNC should normally keep its own authentication enabled for direct access
+- `http` — Certbot standalone HTTP-01; inbound TCP/80 must reach the LXC
+- `duckdns` — automated DNS-01 through the DuckDNS TXT API; no inbound port 80
+  is required for certificate issuance or renewal
+
+KasmVNC should normally keep its own authentication enabled for direct access.
 
 Example:
 
@@ -103,7 +107,26 @@ Example:
 export var_tls_mode="letsencrypt"
 export var_tls_hostname="desktop.example.com"
 export var_tls_email="admin@example.com"
+export var_acme_challenge="http"
 ```
+
+For DuckDNS DNS-01, for example `browser.myhost.duckdns.org`:
+
+```bash
+export var_tls_mode="letsencrypt"
+export var_tls_hostname="browser.myhost.duckdns.org"
+export var_tls_email="admin@example.com"
+export var_acme_challenge="duckdns"
+export var_duckdns_domain="myhost"
+export var_duckdns_token="<duckdns-token>"
+export var_duckdns_update_ip="true"
+```
+
+DuckDNS publishes the TXT value for its base subdomain and its sub-subdomains,
+so the same DuckDNS base domain can validate a hostname below it. The optional
+DDNS timer updates the base domain's public IPv4 every five minutes. The token
+is stored root-only inside the LXC and is not written into the KasmVNC user
+profile.
 
 The certificate is requested with Certbot and copied to
 `/etc/kasmvnc-desktop/tls/` with permissions readable by the KasmVNC service.
