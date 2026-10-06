@@ -155,3 +155,18 @@ ProxmoxVED repository before promotion to ProxmoxVE.
 - bind-mount ownership is not silently modified
 - direct access to an unauthenticated backend should be restricted by firewall
   or network policy when an authenticating reverse proxy is used
+
+
+## Browser sandbox compatibility
+
+Falkon/QtWebEngine and Chromium require unprivileged user namespaces for their
+renderer sandbox. On Proxmox VE 9 the generated LXC AppArmor profile may deny
+`userns_create` even with nesting enabled. For affected browser choices the
+host-side script adds:
+
+```text
+lxc.apparmor.raw: allow userns,
+```
+
+This is intentionally narrower than `lxc.apparmor.profile: unconfined` and
+avoids disabling the browser sandbox with `QTWEBENGINE_DISABLE_SANDBOX=1`.
