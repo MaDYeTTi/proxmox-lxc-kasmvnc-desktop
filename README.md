@@ -23,7 +23,7 @@ Default installation:
 - Falkon
 - persistent `desktop` user/profile
 
-Docker and LXC nesting are not required.
+Docker is not required. Proxmox LXC nesting is enabled for Debian 13 systemd compatibility; the application itself does not run nested containers.
 
 ## Features
 
