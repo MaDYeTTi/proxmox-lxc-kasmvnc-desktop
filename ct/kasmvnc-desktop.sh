@@ -22,6 +22,7 @@ var_os="${var_os:-debian}"
 var_version="${var_version:-13}"
 var_arm64="${var_arm64:-yes}"
 var_unprivileged="${var_unprivileged:-1}"
+var_nesting="${var_nesting:-0}"
 
 # Application-specific variables. These are deliberately environment-driven so
 # they can later map directly to Community Scripts app_vars.
