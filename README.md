@@ -142,6 +142,22 @@ https://desktop.example.com:8443
 The default remains `selfsigned`, which is appropriate when TLS terminates at
 a reverse proxy such as Caddy.
 
+## Browser sandboxing
+
+Falkon and Chromium use Chromium/QtWebEngine renderer sandboxes that require
+unprivileged user namespace creation. On Proxmox VE 9 this can be blocked by the
+generated LXC AppArmor profile even when `nesting=1`.
+
+For browser selections that need it (`falkon`, `chromium`, `both`, or `all`),
+the host-side CT script adds the narrow rule:
+
+```text
+lxc.apparmor.raw: allow userns,
+```
+
+This preserves the browser sandbox. The project does not disable the QtWebEngine
+sandbox and does not use an unconfined AppArmor profile.
+
 ## External authentication / reverse proxy mode
 
 For a deployment where authentication happens at a reverse proxy:
