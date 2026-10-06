@@ -110,6 +110,44 @@ function update_script() {
   exit
 }
 
+browser_needs_userns() {
+  case "$var_browser" in
+  falkon | chromium | both | all) return 0 ;;
+  *) return 1 ;;
+  esac
+}
+
+apply_browser_sandbox_support() {
+  browser_needs_userns || return 0
+
+  local config="/etc/pve/lxc/${CTID}.conf"
+  local rule="lxc.apparmor.raw: allow userns,"
+  local was_running=0
+
+  [[ -f "$config" ]] || {
+    msg_error "Unable to find LXC configuration: ${config}"
+    return 1
+  }
+
+  grep -Fxq "$rule" "$config" && return 0
+
+  if pct status "$CTID" | grep -q "status: running"; then
+    was_running=1
+    msg_info "Stopping container to enable browser sandbox support"
+    pct stop "$CTID"
+    msg_ok "Stopped container"
+  fi
+
+  printf '%s\n' "$rule" >>"$config"
+  msg_ok "Enabled AppArmor user namespaces for the browser sandbox"
+
+  if ((was_running)); then
+    msg_info "Starting container"
+    pct start "$CTID"
+    msg_ok "Started container"
+  fi
+}
+
 validate_bind_mount_entry() {
   local entry="$1"
   local host_path container_path mode extra
@@ -193,6 +231,7 @@ apply_bind_mounts() {
 
 start
 build_container
+apply_browser_sandbox_support
 apply_bind_mounts
 description
 
