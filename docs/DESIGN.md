@@ -20,7 +20,7 @@ the Proxmox Community Scripts project with minimal rework.
 - persistent desktop user and profile
 - Falkon by default
 
-No Docker and no nested container runtime are required.
+No Docker or nested container runtime is used by the application. Proxmox LXC nesting remains enabled because Debian 13 systemd relies on namespace/cgroup isolation features exposed by that setting.
 
 ## Application choices
 
@@ -148,7 +148,7 @@ ProxmoxVED repository before promotion to ProxmoxVE.
 ## Security principles
 
 - unprivileged LXC by default
-- no nesting unless a future feature proves it necessary
+- Proxmox LXC nesting enabled for Debian 13 systemd compatibility; the application itself does not run nested containers
 - browser runs as a non-root user
 - external/no-auth mode is opt-in
 - arbitrary shell execution is not accepted as an installer option
